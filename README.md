@@ -25,6 +25,7 @@ Please see our [installation guide](./INSTALL.md)
 
 &copy; 2025 Databricks, Inc. All rights reserved. The source in this project is provided subject to the Databricks License [https://databricks.com/db-license-source]. All included or referenced third party libraries are subject to the licenses set forth below.
 
-| Package | Purpose | License | Source |
-|---------|---------|---------|--------|
-| pydicom	| Python api for DICOM files |	MIT	| https://github.com/pydicom/pydicom |
+| Datasource | Package    | Purpose                           | License     | Source                               |
+| ---------- | ---------- | --------------------------------- | ----------- | ------------------------------------ |
+| zipdcm     | pydicom	  | Python api for DICOM files        |	MIT	        | https://github.com/pydicom/pydicom   |
+| zipdcm     | pylibjpeg  | Decoding / Encoding pixel formats | GPLv3 & MIT | https://github.com/pydicom/pylibjpeg |
