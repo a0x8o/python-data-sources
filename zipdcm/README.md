@@ -8,10 +8,15 @@ from dbx.zip_dcm_ds import ZipDCMDataSource
 spark.dataSource.register(ZipDCMDataSource)
 
 # read DCMs with `numPartitions` parallelism.
-df = spark.read.format("zipdcm").option('numPartitions',4).load("./resources")
+df = (
+    spark.read
+    .format("zipdcm")
+    .option("numPartitions",4)
+    .load("./resources")
+)
 df.display()
 ```
-For more, see our [demo]($./demo) notebook.
+For more, see our [demo](./zip-dicom-demo.ipynb) notebook.
 
 ## Install
 
@@ -38,3 +43,6 @@ Run unit tests
 ```bash
 make test
 ```
+
+### Synthetic PHI data source citation
+Rutherford, M. W., Nolan, T., Pei, L., Wagner, U., Pan, Q., Farmer, P., Smith, K., Kopchick, B., Laura Opsahl-Ong, Sutton, G., Clunie, D. A., Farahani, K., & Prior, F. (2025). Data in Support of the MIDI-B Challenge (MIDI-B-Synthetic-Validation, MIDI-B-Curated-Validation, MIDI-B-Synthetic-Test, MIDI-B-Curated-Test) (Version 1) [Dataset]. The Cancer Imaging Archive. https://doi.org/10.7937/CF2P-AW56 
