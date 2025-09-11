@@ -1,4 +1,4 @@
-.PHONY: dev test unit style
+.PHONY: dev test unit style check
 
 all: clean style test 
 
@@ -25,3 +25,4 @@ dev:
 style:
 	pre-commit run --all-files
 
+check: style test
