@@ -52,9 +52,9 @@ pythonpath = [
 ]
 
 readme = "README.md"
-license = "GPL-3.0-or-later"
+license = "EPL-2.0"
 license-files = ["LICEN[CS]E*"]
 
 [project.urls]
-Homepage = "https://github.com/jefferyann-db/python-datasource-connectors"
+Homepage = "https://github.com/jefferyann-db/python-datasource-connectors/mqtt"
 Issues = "https://github.com/jefferyann-db/python-datasource-connectors/issues"

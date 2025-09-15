@@ -82,7 +82,7 @@ MQTT_BROKER_TOPIC_PREFIX=
 
 * Run tests from project root directory
 ```shell
-pytest tests/
+make test
 ```
 
 * Build package
@@ -122,6 +122,14 @@ Please **do not submit support tickets** to Databricks for issues related to the
 The source code provided is subject to the Databricks [LICENSE](https://github.com/databricks-industry-solutions/python-data-sources/blob/main/LICENSE.md) . All third-party libraries included or referenced are subject to their respective licenses set forth in the project license.  
 
 Any issues or bugs found should be submitted as **GitHub Issues** on the project repository. While these will be reviewed as time permits, there are **no formal SLAs** for support.
+
+## 📄 Third-Party Package Licenses
+
+&copy; 2025 Databricks, Inc. All rights reserved. The source in this project is provided subject to the Databricks License [https://databricks.com/db-license-source]. All included or referenced third party libraries are subject to the licenses set forth below.
+
+| Datasource | Package    | Purpose                           | License     | Source                               |
+| ---------- | ---------- | --------------------------------- | ----------- | ------------------------------------ |
+| paho-mqtt     | paho-mqtt	  | Python api for mqtt        |	EPL-v20	        | https://pypi.org/project/paho-mqtt/   |
 
 ## References
 

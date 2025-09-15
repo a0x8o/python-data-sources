@@ -222,9 +222,9 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
                 client.subscribe(self.topic, qos=self.qos)
-                logger.warning(f"Connected to broker")
+                logger.warning(f"Connected to broker {self.broker_address} on port {self.port} with topic {self.topic}")
             else:
-                logger.warning("Connection failed")
+                logger.error(f"Connection failed to broker {self.broker_address} on port {self.port} with topic {self.topic}")
 
         def on_message(client, userdata, message):
             msg_data = [
@@ -244,8 +244,23 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
         try:
             client.connect(self.broker_address, self.port, self.keep_alive)
         except Exception as e:
-            logger.exception("Failed to connect to broker.", exc_info=e)
-            raise
+            connection_context = {
+                "broker_address": self.broker_address,
+                "port": self.port,
+                "topic": self.topic,
+                "client_id": self.client_id,
+                "require_tls": self.require_tls,
+                "keepalive": self.keep_alive,
+                "qos": self.qos,
+                "clean_session": self.clean_session,
+                "conn_timeout": self.conn_timeout
+            }
+            
+            error_msg = f"Failed to connect to MQTT broker. Connection details: {connection_context}"
+            logger.exception(error_msg, exc_info=e)
+            
+            # Re-raise with enhanced context
+            raise ConnectionError(error_msg) from e
         client.loop_start()  # Use loop_start to run the loop in a separate thread
 
         time.sleep(self.conn_timeout)  # Wait for messages for the specified timeout
