@@ -129,7 +129,7 @@ Any issues or bugs found should be submitted as **GitHub Issues** on the project
 
 | Datasource | Package    | Purpose                           | License     | Source                               |
 | ---------- | ---------- | --------------------------------- | ----------- | ------------------------------------ |
-| paho-mqtt     | paho-mqtt	  | Python api for mqtt        |	EPL-v20	        | https://pypi.org/project/paho-mqtt/   |
+| paho-mqtt     | paho-mqtt	  | Python api for mqtt        |	EPL-v20 & EDL-v10	        | https://pypi.org/project/paho-mqtt/   |
 
 ## References
 
