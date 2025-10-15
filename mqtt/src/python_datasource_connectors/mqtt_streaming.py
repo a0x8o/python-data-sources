@@ -106,8 +106,7 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
         super().__init__()
         self.topic = self._parse_topic(options.get("topic", "#"))
         self.broker_address = options.get("broker_address")
-        str_tls = options.get("require_tls", True).lower()
-        self.require_tls = True if str_tls == "true" else False
+        self.require_tls = options.get("require_tls", True)
         self.port = int(options.get("port", 8883))
         self.username = options.get("username", "")
         self.password = options.get("password", "")
