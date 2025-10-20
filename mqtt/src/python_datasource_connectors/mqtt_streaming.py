@@ -121,7 +121,7 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
         self.port = int(options.get("port", 8883))
         self.username = options.get("username", "")
         self.password = options.get("password", "")
-        self.qos = int(options.get("qos", 0))
+        self.qos = int(options.get("qos", 2))
         self.keep_alive = int(options.get("keepalive", 60))
         self.clean_session = options.get("clean_session", False)
         self.conn_timeout = int(options.get("conn_time", 1))
