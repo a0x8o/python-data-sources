@@ -1,6 +1,8 @@
 import datetime
+import ipaddress
 import logging
 import random
+import re
 import subprocess
 import sys
 import time
@@ -28,13 +30,19 @@ class MqttDataSource(DataSource):
     supporting various MQTT broker configurations including authentication,
     SSL/TLS encryption, and different quality of service levels.
     
+    Input validation is performed on critical parameters to ensure connection reliability.
+    
     Supported options:
-    - broker_address: MQTT broker hostname or IP address (required)
-    - port: Broker port number (default: 8883)
+    - broker_address: MQTT broker hostname or IP address (required, validated)
+        * Must be a valid hostname or IP address format
+        * Cannot be None, empty, or whitespace-only
+    - port: Broker port number (default: 8883, validated)
+        * Must be an integer in range 1-65535
     - username: Authentication username (optional)
     - password: Authentication password (optional)
     - topic: MQTT topic to subscribe to (default: "#" for all topics)
-    - qos: Quality of Service level 0-2 (default: 0)
+    - qos: Quality of Service level 0-2 (default: 0, validated)
+        * Must be 0, 1, or 2 (standard MQTT QoS levels)
     - require_tls: Enable SSL/TLS encryption (default: true)
     - keepalive: Keep alive interval in seconds (default: 60)
     
@@ -45,6 +53,9 @@ class MqttDataSource(DataSource):
             .option("username", "user")
             .option("password", "pass")
             .load()
+    
+    Raises:
+        ValueError: If broker_address, port, clean_session, or qos parameters are invalid.
     """
 
     @classmethod
@@ -114,13 +125,17 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
         self.keep_alive = int(options.get("keepalive", 60))
         self.clean_session = options.get("clean_session", False)
         self.conn_timeout = int(options.get("conn_time", 1))
-        self.clean_sesion = options.get("clean_sesion", False)
+        self.clean_session = options.get("clean_session", False)
         self.ca_certs = options.get("ca_certs", None)
         self.certfile = options.get("certfile", None)
         self.keyfile = options.get("keyfile", None)
         self.tls_disable_certs = options.get("tls_disable_certs", None)
-        if self.clean_sesion not in [True, False]:
-            raise ValueError(f"Unsupported sesion: {self.clean_sesion}")
+        
+        # Validate all input parameters
+        self._validate_input_parameters()
+        
+        if self.clean_session not in [True, False]:
+            raise ValueError(f"Unsupported sesion: {self.clean_session}")
         self.client_id = f'spark-data-source-mqtt-{random.randint(0, 1000000)}'
         self.current = 0
         self.new_data = []
@@ -132,6 +147,103 @@ class MqttSimpleStreamReader(SimpleDataSourceStreamReader):
             logger.warn("Installing paho-mqtt...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", "paho-mqtt"])
             # importlib.reload(sys.modules[__name__])
+
+    def _validate_input_parameters(self):
+        """
+        Validate all input parameters for the MQTT connection.
+        
+        Raises:
+            ValueError: If any parameter is invalid.
+        """
+        # Validate broker address
+        self._validate_broker_address()
+        
+        # Validate port range
+        self._validate_port()
+        
+        # Validate QoS level
+        self._validate_qos()
+
+    def _validate_broker_address(self):
+        """
+        Validate that the broker address is provided and properly formatted.
+        
+        Raises:
+            ValueError: If broker address is None, empty, or improperly formatted.
+        """
+        if not self.broker_address:
+            raise ValueError("broker_address is required and cannot be None or empty")
+        
+        if not isinstance(self.broker_address, str):
+            raise ValueError("broker_address must be a string")
+        
+        self.broker_address = self.broker_address.strip()
+        if not self.broker_address:
+            raise ValueError("broker_address cannot be empty or just whitespace")
+        
+        # Check if it's a valid IP address
+        try:
+            ipaddress.ip_address(self.broker_address)
+            return  # Valid IP address
+        except ValueError:
+            pass  # Not an IP address, check if it's a valid hostname
+        
+        # Validate hostname format
+        if not self._is_valid_hostname(self.broker_address):
+            raise ValueError(f"broker_address '{self.broker_address}' is not a valid hostname or IP address")
+
+    def _is_valid_hostname(self, hostname):
+        """
+        Check if a string is a valid hostname according to RFC standards.
+        
+        Args:
+            hostname (str): The hostname to validate.
+            
+        Returns:
+            bool: True if valid hostname, False otherwise.
+        """
+        if len(hostname) > 253:
+            return False
+        
+        # Remove trailing dot if present
+        if hostname.endswith('.'):
+            hostname = hostname[:-1]
+        
+        # Hostname regex pattern
+        # Allows letters, numbers, hyphens, and dots
+        # Must start and end with alphanumeric characters
+        hostname_pattern = re.compile(
+            r'^(?!-)(?:[a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}(?<!-)$'
+        )
+        
+        return bool(hostname_pattern.match(hostname))
+
+    def _validate_port(self):
+        """
+        Validate that the port is within the valid range (1-65535).
+        
+        Raises:
+            ValueError: If port is not in the valid range.
+        """
+        if not isinstance(self.port, int):
+            raise ValueError(f"port must be an integer, got {type(self.port).__name__}")
+        
+        if self.port < 1 or self.port > 65535:
+            raise ValueError(f"port must be in range 1-65535, got {self.port}")
+
+    def _validate_qos(self):
+        """
+        Validate that the QoS level is one of the valid MQTT QoS values (0, 1, or 2).
+        
+        Raises:
+            ValueError: If QoS is not 0, 1, or 2.
+        """
+        if not isinstance(self.qos, int):
+            raise ValueError(f"qos must be an integer, got {type(self.qos).__name__}")
+        
+        valid_qos_levels = [0, 1, 2]
+        if self.qos not in valid_qos_levels:
+            raise ValueError(f"qos must be one of {valid_qos_levels}, got {self.qos}")
 
     def _parse_topic(self, topic_str: str):
         """

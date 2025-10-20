@@ -1,6 +1,4 @@
-psycopg2-binary==2.9.9
 databricks-sdk>=0.66.0
-databricks-sql-connector>=2.9.0
 flask>=2.3.0
 pandas>=1.5.0
 paho-mqtt>=2.0.0
