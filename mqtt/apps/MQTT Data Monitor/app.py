@@ -9,11 +9,21 @@ from databricks.sdk.service import jobs
 import os
 import json
 import time
+import re
 import paho.mqtt.client as mqtt_client
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+# Create logger for this application
+logger = logging.getLogger(__name__)
+
+# Suppress werkzeug logging to reduce noise
+werkzeug_log = logging.getLogger('werkzeug')
+werkzeug_log.setLevel(logging.ERROR)
 
 flask_app = Flask(__name__)
 
@@ -21,7 +31,7 @@ flask_app = Flask(__name__)
 client = WorkspaceClient()
 
 # Database connection function
-def get_data(query, warehouse_id):
+def get_data(query, warehouse_id, params=None):
     """Execute query with fallback to demo data"""
     try:
         cfg = Config()
@@ -31,19 +41,19 @@ def get_data(query, warehouse_id):
                 http_path=f"/sql/1.0/warehouses/{warehouse_id}",
                 credentials_provider=lambda: cfg.authenticate
             ) as connection:
-                df = pandas.read_sql(query, connection)
+                if params:
+                    df = pandas.read_sql(query, connection, params=params)
+                else:
+                    df = pandas.read_sql(query, connection)
                 # Convert DataFrame to list of dictionaries
                 return df.to_dict('records')
     except Exception as e:
-        print(f"Database query failed: {e}")
+        logger.error(f"Database query failed: {e}")
         # Return empty list on error so we can show a message
         return []
 
 
 def create_job(client, notebook_path, cluster_id):
-    # cluster_id = (
-    #     w.clusters.ensure_cluster_is_running(os.environ["DATABRICKS_CLUSTER_ID"]) and os.environ["DATABRICKS_CLUSTER_ID"]
-    # )
 
     created_job = client.jobs.create(
         name=f"mqtt_{time.time_ns()}",
@@ -91,9 +101,9 @@ def mqtt_remote_client(mqtt_server_config):
         # Callback function for when the client connects
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                print("Connected successfully to MQTT Broker!")
+                logger.info("Connected successfully to MQTT Broker!")
             else:
-                print(f"Failed to connect, return code {rc}\n")
+                logger.error(f"Failed to connect, return code {rc}")
 
         client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1, client_id="mqtt_connection_test", clean_session=True)
         
@@ -163,10 +173,10 @@ def get_mqtt_stats():
     """Get MQTT message statistics from data"""
     if not curr_data or len(curr_data) == 0:
         return {
-            'critical': 0,
-            'in_progress': 0,
-            'resolved_today': 0,
-            'avg_response_time': 0
+            'duplicated_messages': 0,
+            'qos2_messages': 0,
+            'unique_topics': 0,
+            'total_messages': 0
         }
     
     # Count duplicated messages
@@ -179,10 +189,10 @@ def get_mqtt_stats():
     row_count = len(curr_data)
     
     return {
-        'critical': duplicated,
-        'in_progress': qos2_messages,
-        'resolved_today': unique_topics,
-        'avg_response_time': row_count
+        'duplicated_messages': duplicated,
+        'qos2_messages': qos2_messages,
+        'unique_topics': unique_topics,
+        'total_messages': row_count
     }
 
 
@@ -250,8 +260,8 @@ def start_mqtt_job():
             }), 400
         
         # Get notebook_path and cluster_id from config
-        notebook_path = mqtt_config.get('notebook_path', '/Workspace/Users/jeffery.annor@databricks.com/mqtt/MQTT_data_source_v0')
-        cluster_id = mqtt_config.get('cluster_id', '0709-132523-cnhxf2p6')
+        notebook_path = mqtt_config.get('notebook_path')
+        cluster_id = mqtt_config.get('cluster_id')
         
         # Create the job
         created_job = create_job(client, notebook_path, cluster_id)
@@ -286,7 +296,7 @@ def refresh_data():
         catalog = data.get('catalog')
         schema = data.get('schema')
         table = data.get('table')
-        # warehouse_id = data.get('warehouse_id', DEFAULT_WAREHOUSE_ID)
+        warehouse_id = data.get('warehouse_id', '4b9b953939869799')  # Default fallback
         
         # Validate required fields
         if not catalog or not schema or not table:
@@ -295,11 +305,11 @@ def refresh_data():
                 'error': 'Catalog, Schema, and Table name are required'
             }), 400
         
-        # Build the query
-        query = f"SELECT message, is_duplicate, qos, topic, received_time FROM {catalog}.{schema}.{table} ORDER BY received_time DESC LIMIT 100"
+        # Build the query with parameterized values
+        query = "SELECT message, is_duplicate, qos, topic, received_time FROM %s.%s.%s ORDER BY received_time DESC LIMIT %s"
         
-        # Fetch data using get_data function
-        curr_data = get_data(query, "4b9b953939869799")
+        # Fetch data using get_data function with parameters
+        curr_data = get_data(query, warehouse_id, (catalog, schema, table, 100))
         
         # Calculate stats from refreshed data
         stats = get_mqtt_stats()
@@ -358,7 +368,7 @@ def get_severity_color(severity):
         return 'bg-gray-100 text-gray-800'
 
 if __name__ == '__main__':
-    print("🚀 Starting MQTT Data Monitor Dashboard")
-    print("📡 MQTT Message Processing & Analytics Platform")
-    print("=" * 50)
+    logger.info("Starting MQTT Data Monitor Dashboard")
+    logger.info("MQTT Message Processing & Analytics Platform")
+    logger.info("=" * 50)
     flask_app.run(debug=True, host='0.0.0.0', port=8001)

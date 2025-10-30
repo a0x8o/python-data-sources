@@ -267,7 +267,7 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-mqtt-text-light">Duplicated Messages</p>
-                        <p class="text-2xl font-semibold text-mqtt-error">{{ stats.critical }}</p>
+                        <p class="text-2xl font-semibold text-mqtt-error">{{ stats.duplicated_messages }}</p>
                     </div>
                 </div>
             </div>
@@ -281,7 +281,7 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-mqtt-text-light">QOS=2 Messages</p>
-                        <p class="text-2xl font-semibold text-mqtt-warning">{{ stats.in_progress }}</p>
+                        <p class="text-2xl font-semibold text-mqtt-warning">{{ stats.qos2_messages }}</p>
                     </div>
                 </div>
             </div>
@@ -295,7 +295,7 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-mqtt-text-light">Unique Topics</p>
-                        <p class="text-2xl font-semibold text-mqtt-success">{{ stats.resolved_today }}</p>
+                        <p class="text-2xl font-semibold text-mqtt-success">{{ stats.unique_topics }}</p>
                     </div>
                 </div>
             </div>
@@ -309,7 +309,7 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-mqtt-text-light">Total Messages</p>
-                        <p class="text-2xl font-semibold text-mqtt-azure">{{ stats.avg_response_time }}</p>
+                        <p class="text-2xl font-semibold text-mqtt-azure">{{ stats.total_messages }}</p>
                     </div>
                 </div>
             </div>

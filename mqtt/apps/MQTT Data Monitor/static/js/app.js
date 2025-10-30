@@ -8,25 +8,25 @@ function updateStatsCards(stats) {
     // Update Duplicated Messages
     const duplicatedElement = document.querySelector('.text-2xl.font-semibold.text-mqtt-error');
     if (duplicatedElement) {
-        duplicatedElement.textContent = stats.critical || 0;
+        duplicatedElement.textContent = stats.duplicated_messages || 0;
     }
     
     // Update QOS=2 Messages
     const qos2Element = document.querySelector('.text-2xl.font-semibold.text-mqtt-warning');
     if (qos2Element) {
-        qos2Element.textContent = stats.in_progress || 0;
+        qos2Element.textContent = stats.qos2_messages || 0;
     }
     
     // Update Unique Topics
     const topicsElement = document.querySelector('.text-2xl.font-semibold.text-mqtt-success');
     if (topicsElement) {
-        topicsElement.textContent = stats.resolved_today || 0;
+        topicsElement.textContent = stats.unique_topics || 0;
     }
     
     // Update Total Messages
     const totalElement = document.querySelector('.text-2xl.font-semibold.text-mqtt-azure');
     if (totalElement) {
-        totalElement.textContent = stats.avg_response_time || 0;
+        totalElement.textContent = stats.total_messages || 0;
     }
 }
 
@@ -439,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             try {
                 console.log('Sending refresh request...');
+                const warehouseId = document.getElementById('warehouse_id').value;
                 const response = await fetch('/api/refresh-data', {
                     method: 'POST',
                     headers: {
@@ -448,6 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         catalog: catalog,
                         schema: schema,
                         table: table,
+                        warehouse_id: warehouseId,
                     })
                 });
                 
@@ -490,6 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const catalog = document.getElementById('catalog').value;
         const schema = document.getElementById('schema').value;
         const table = document.getElementById('table').value;
+        const warehouseId = document.getElementById('warehouse_id').value;
         
         // Only refresh if all fields are filled
         if (!catalog || !schema || !table) {
@@ -507,6 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     catalog: catalog,
                     schema: schema,
                     table: table,
+                    warehouse_id: warehouseId,
                 })
             });
             
