@@ -45,7 +45,7 @@ def get_data(query, warehouse_id, params=None):
                     df = pandas.read_sql(query, connection, params=params)
                 else:
                     df = pandas.read_sql(query, connection)
-                # Convert DataFrame to list of dictionaries
+
                 return df.to_dict('records')
     except Exception as e:
         logger.error(f"Database query failed: {e}")
