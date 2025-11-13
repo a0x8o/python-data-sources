@@ -61,6 +61,29 @@ df = spark.read.format("mcap") \
     .load()
 ```
 
+### Filtering by Topic at Read Time
+
+For better performance, filter by topic during the read operation instead of after loading:
+
+```python
+# Read only "pose" topic messages (more efficient than df.filter())
+df = spark.read.format("mcap") \
+    .option("path", "/path/to/file.mcap") \
+    .option("topicFilter", "pose") \
+    .load()
+
+# Read all topics (default behavior)
+df = spark.read.format("mcap") \
+    .option("path", "/path/to/file.mcap") \
+    .option("topicFilter", "*") \
+    .load()
+
+# Or simply omit topicFilter to read all topics
+df = spark.read.format("mcap") \
+    .option("path", "/path/to/file.mcap") \
+    .load()
+```
+
 ### Options
 
 | Option | Default | Description |
@@ -69,6 +92,7 @@ df = spark.read.format("mcap") \
 | `pathGlobFilter` | `*.mcap` | Glob pattern for file matching |
 | `numPartitions` | `4` | Number of partitions for parallel processing |
 | `recursiveFileLookup` | `false` | Recursively search subdirectories |
+| `topicFilter` | *(none)* | Filter by specific topic name. Use `*` or omit to read all topics |
 
 ### Schema
 
@@ -76,6 +100,7 @@ The data source produces a DataFrame with the following schema:
 
 | Column | Type | Description |
 |--------|------|-------------|
+| `sequence` | BIGINT | Sequential message number within partition (starts at 0) |
 | `topic` | STRING | The message topic (e.g., "pose", "camera_jpeg") |
 | `schema` | STRING | The schema name (e.g., "foxglove.PoseInFrame") |
 | `encoding` | STRING | The encoding type (protobuf, json, etc.) |
@@ -113,6 +138,9 @@ audio_df = df.filter(col("topic") == "microphone")
 
 # Multiple topics
 events_df = df.filter(col("topic").isin(["mouse", "keyboard"]))
+
+# Order by sequence to maintain message order
+ordered_df = df.orderBy("sequence")
 ```
 
 ### Aggregations
@@ -217,14 +245,24 @@ MCAP Files → File Discovery → Partitioning → Parallel Read → Decode → 
 
 ## Performance Tips
 
-1. **Partitioning**: Adjust `numPartitions` based on cluster size
+1. **Topic Filtering at Read Time**: Use `topicFilter` option for best performance
    ```python
-   .option("numPartitions", "16")  # For larger clusters
+   # BEST: Filter during read (skips unwanted messages early)
+   df = spark.read.format("mcap") \
+       .option("path", "/path/to/file.mcap") \
+       .option("topicFilter", "pose") \
+       .load()
+   
+   # GOOD: Filter after read (still efficient with predicate pushdown)
+   df = spark.read.format("mcap") \
+       .option("path", "/path/to/file.mcap") \
+       .load() \
+       .filter(col("topic") == "pose")
    ```
 
-2. **Filtering Early**: Filter by topic before processing data
+2. **Partitioning**: Adjust `numPartitions` based on cluster size
    ```python
-   df.filter(col("topic") == "pose")  # Push down filter
+   .option("numPartitions", "16")  # For larger clusters
    ```
 
 3. **Select Only Needed Fields**: Extract JSON fields early
@@ -248,18 +286,23 @@ MCAP Files → File Discovery → Partitioning → Parallel Read → Decode → 
 - Messages with unknown encodings fall back to hex-encoded `raw_data`
 - Check protobuf dependencies if protobuf decoding fails
 
-### Memory Issues
-- Reduce `numPartitions` if executors run out of memory
-- Process data in batches by topic or time range
-- Consider sampling large files first
 
-## License
 
-This data source is part of the db-test project.
+## 📄 Third-Party Package Licenses
 
-## See Also
+&copy; 2025 Databricks, Inc. All rights reserved. The source in this project is provided subject to the Databricks License [https://databricks.com/db-license-source]. All included or referenced third party libraries are subject to the licenses set forth below.
+
+| Package | Purpose | License | Source |
+| ------- | ------- | ------- | ------ |
+| mcap | MCAP file format reader | MIT | https://pypi.org/project/mcap/ |
+| mcap-protobuf-support | Protobuf decoder for MCAP | MIT | https://pypi.org/project/mcap-protobuf-support/ |
+| protobuf | Protocol Buffers serialization | BSD-3-Clause | https://pypi.org/project/protobuf/ |
+| pyspark | Apache Spark Python API | Apache-2.0 | https://pypi.org/project/pyspark/ |
+
+## References
 
 - [MCAP Format Specification](https://mcap.dev/)
 - [Apache Spark Data Source API](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataSource.html)
 - [ROS 2 Documentation](https://docs.ros.org/)
+- [Foxglove Studio](https://foxglove.dev/)
 

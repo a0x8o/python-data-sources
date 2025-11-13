@@ -75,20 +75,32 @@ DECODERS = {
 }
 
 
-def _read_mcap_file(file_path: str) -> Iterator[Tuple]:
+def _read_mcap_file(file_path: str, topic_filter: str = None) -> Iterator[Tuple]:
     """
     Read a single MCAP file and yield rows.
     
+    Args:
+        file_path: Path to the MCAP file
+        topic_filter: Optional topic name to filter messages. If None or "*", read all topics.
+    
     Yields:
-        Tuples of (topic, schema, encoding, log_time, data_json)
+        Tuples of (sequence, topic, schema, encoding, log_time, data_json)
     """
-    logger.debug(f"Reading MCAP file: {file_path}")
+    logger.debug(f"Reading MCAP file: {file_path}, topic_filter: {topic_filter}")
+    
+    # Treat "*" as no filter
+    if topic_filter == "*":
+        topic_filter = None
     
     try:
         with open(file_path, "rb") as f:
             reader = make_reader(f)
             
             for schema, channel, message in reader.iter_messages():
+                # Apply topic filter if specified
+                if topic_filter and channel.topic != topic_filter:
+                    continue
+                
                 enc = (channel.message_encoding or schema.encoding).lower()
                 if enc not in DECODERS:
                     enc = "fallback"
@@ -105,6 +117,7 @@ def _read_mcap_file(file_path: str) -> Iterator[Tuple]:
                 data_json = json.dumps(msg_dict)
                 
                 yield (
+                    int(message.sequence),
                     channel.topic,
                     schema.name,
                     enc,
@@ -116,21 +129,22 @@ def _read_mcap_file(file_path: str) -> Iterator[Tuple]:
         raise
 
 
-def _read_mcap_partition(partition: RangePartition, paths: list) -> Iterator[Tuple]:
+def _read_mcap_partition(partition: RangePartition, paths: list, topic_filter: str = None) -> Iterator[Tuple]:
     """
     Read MCAP files for a given partition range.
     
     Args:
         partition: RangePartition with start and end indices
         paths: List of file paths to process
+        topic_filter: Optional topic name to filter messages. If None or "*", read all topics.
     
     Yields:
-        Tuples of (topic, schema, encoding, log_time, data_json)
+        Tuples of (sequence, topic, schema, encoding, log_time, data_json)
     """
-    logger.debug(f"Processing partition: {partition}, paths subset: {paths[partition.start:partition.end]}")
+    logger.debug(f"Processing partition: {partition}, paths subset: {paths[partition.start:partition.end]}, topic_filter: {topic_filter}")
     
     for file_path in paths[partition.start:partition.end]:
-        yield from _read_mcap_file(file_path)
+        yield from _read_mcap_file(file_path, topic_filter=topic_filter)
 
 
 class MCAPDataSourceReader(DataSourceReader):
@@ -146,12 +160,20 @@ class MCAPDataSourceReader(DataSourceReader):
         self.pathGlobFilter = self.options.get("pathGlobFilter", DEFAULT_pathGlobFilter)
         self.recursiveFileLookup = bool(self.options.get("recursiveFileLookup", "false"))
         self.numPartitions = int(self.options.get("numPartitions", DEFAULT_numPartitions))
+        self.topicFilter = self.options.get("topicFilter", None)
+        
+        # Treat "*" as no filter
+        if self.topicFilter == "*":
+            self.topicFilter = None
         
         assert self.path is not None, "path option is required"
         self.paths = _path_handler(self.path, self.pathGlobFilter)
         
         if not self.paths:
             logger.warning(f"No MCAP files found at path: {self.path} with filter: {self.pathGlobFilter}")
+        
+        if self.topicFilter:
+            logger.info(f"Topic filter enabled: {self.topicFilter}")
 
     def partitions(self) -> Sequence[RangePartition]:
         """
@@ -188,15 +210,15 @@ class MCAPDataSourceReader(DataSourceReader):
             partition: The partition to read
             
         Returns:
-            Iterator of tuples (topic, schema, encoding, log_time, data_json)
+            Iterator of tuples (sequence, topic, schema, encoding, log_time, data_json)
         """
-        logger.debug(f"MCAPDataSourceReader.read({partition}, {self.path}, paths: {self.paths})")
+        logger.debug(f"MCAPDataSourceReader.read({partition}, {self.path}, paths: {self.paths}, topicFilter: {self.topicFilter})")
         
         assert self.path is not None, f"path: {self.path}"
         assert self.paths is not None, f"paths: {self.paths}"
         
         # Library imports must be within the method for executor-level execution
-        return _read_mcap_partition(partition, self.paths)
+        return _read_mcap_partition(partition, self.paths, topic_filter=self.topicFilter)
 
 
 class MCAPDataSource(DataSource):
@@ -204,19 +226,28 @@ class MCAPDataSource(DataSource):
     A data source for batch query over MCAP (ROS 2 bag) files.
     
     Usage:
+        # Read all topics
         df = spark.read.format("mcap").option("path", "/path/to/mcap/files").load()
+        
+        # Filter by specific topic at read time (more efficient than DataFrame filter)
+        df = spark.read.format("mcap") \
+            .option("path", "/path/to/mcap/files") \
+            .option("topicFilter", "pose") \
+            .load()
         
     Options:
         - path: Path to MCAP file(s) or directory (required)
         - pathGlobFilter: Glob pattern for file matching (default: "*.mcap")
         - numPartitions: Number of partitions to split files across (default: 4)
         - recursiveFileLookup: Recursively search subdirectories (default: false)
+        - topicFilter: Filter messages by topic name (optional). Use "*" or omit to read all topics.
     
     Schema:
+        - sequence: BIGINT - The message sequence number from MCAP
         - topic: STRING - The message topic
         - schema: STRING - The schema name
         - encoding: STRING - The encoding type (protobuf, json, etc.)
-        - log_time: LONG - The message timestamp in nanoseconds
+        - log_time: BIGINT - The message timestamp in nanoseconds
         - data: STRING - JSON string containing all message fields
     """
     
@@ -227,7 +258,7 @@ class MCAPDataSource(DataSource):
         return datasource_type
 
     def schema(self):
-        schema = "topic STRING, schema STRING, encoding STRING, log_time BIGINT, data STRING"
+        schema = "sequence BIGINT, topic STRING, schema STRING, encoding STRING, log_time BIGINT, data STRING"
         logger.debug(f"MCAPDataSource.schema({schema})")
         return schema
 

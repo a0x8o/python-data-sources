@@ -65,11 +65,27 @@ def test_mcap_datasource():
         
         # Show sample data
         print("\nSample data (first 3 rows):")
-        df.select("topic", "schema", "encoding", "log_time").show(3, truncate=False)
+        df.select("sequence", "topic", "schema", "encoding", "log_time").show(3, truncate=False)
         
-        # Test filtering
+        # Verify sequence ordering
+        sequences = df.select("sequence").orderBy("sequence").limit(5).collect()
+        print(f"\n✓ Sequence numbers: {[row.sequence for row in sequences]}")
+        
+        # Test filtering with DataFrame filter
         pose_count = df.filter(df.topic == "pose").count()
-        print(f"\n✓ Pose messages: {pose_count}")
+        print(f"\n✓ Pose messages (DataFrame filter): {pose_count}")
+        
+        # Test filtering with topicFilter option (more efficient)
+        print("\nTesting topicFilter option...")
+        pose_df = spark.read.format("mcap") \
+            .option("path", test_file) \
+            .option("topicFilter", "pose") \
+            .load()
+        pose_count_filtered = pose_df.count()
+        print(f"✓ Pose messages (topicFilter): {pose_count_filtered}")
+        
+        # Verify both methods return same count
+        assert pose_count == pose_count_filtered, "Topic filter counts don't match!"
         
         # Extract JSON field
         from pyspark.sql.functions import get_json_object, col
