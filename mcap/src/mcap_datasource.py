@@ -14,16 +14,28 @@ DEFAULT_numPartitions = 4
 DEFAULT_pathGlobFilter = "*.mcap"
 
 
-def _path_handler(path: str, glob_pattern: str) -> list:
+def _path_handler(path: str, glob_pattern: str, recursive: bool = False) -> list:
     """
     Discover files matching the glob pattern in the given path.
+    
+    Args:
+        path: Path to search for files
+        glob_pattern: Glob pattern to match files (e.g., "*.mcap")
+        recursive: If True, recursively search subdirectories using rglob
+    
+    Returns:
+        List of file paths matching the pattern
     """
     path_obj = Path(path)
     
     if path_obj.is_file():
         return [str(path_obj)]
     elif path_obj.is_dir():
-        files = sorted(path_obj.glob(glob_pattern))
+        # Use rglob for recursive search, glob for non-recursive
+        if recursive:
+            files = sorted(path_obj.rglob(glob_pattern))
+        else:
+            files = sorted(path_obj.glob(glob_pattern))
         return [str(f) for f in files if f.is_file()]
     else:
         # Try glob pattern on parent directory
@@ -101,9 +113,15 @@ def _read_mcap_file(file_path: str, topic_filter: str = None) -> Iterator[Tuple]
                 if topic_filter and channel.topic != topic_filter:
                     continue
                 
-                enc = (channel.message_encoding or schema.encoding).lower()
-                if enc not in DECODERS:
+                # Safely extract encoding, handling None values to prevent AttributeError
+                # Some MCAP files may have missing encoding metadata
+                enc_raw = channel.message_encoding or getattr(schema, "encoding", None)
+                if not enc_raw:
                     enc = "fallback"
+                else:
+                    enc = enc_raw.lower()
+                    if enc not in DECODERS:
+                        enc = "fallback"
                 
                 decoded_fn = DECODERS.get(enc, decode_fallback)
                 
@@ -167,10 +185,13 @@ class MCAPDataSourceReader(DataSourceReader):
             self.topicFilter = None
         
         assert self.path is not None, "path option is required"
-        self.paths = _path_handler(self.path, self.pathGlobFilter)
+        self.paths = _path_handler(self.path, self.pathGlobFilter, recursive=self.recursiveFileLookup)
         
         if not self.paths:
             logger.warning(f"No MCAP files found at path: {self.path} with filter: {self.pathGlobFilter}")
+        
+        if self.recursiveFileLookup:
+            logger.info(f"Recursive file lookup enabled, found {len(self.paths)} files")
         
         if self.topicFilter:
             logger.info(f"Topic filter enabled: {self.topicFilter}")
@@ -265,4 +286,3 @@ class MCAPDataSource(DataSource):
     def reader(self, schema: StructType):
         logger.debug(f"MCAPDataSource.reader({schema}, options={self.options})")
         return MCAPDataSourceReader(schema, self.options)
-

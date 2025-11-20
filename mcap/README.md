@@ -29,7 +29,6 @@ pip install protobuf
 ### Files
 
 - `mcap_datasource.py` - The main data source implementation
-- `mcap_spark_example.py` - Example usage script
 - `mcap_reader` - Standalone reader (non-Spark)
 
 ## Usage
@@ -54,10 +53,16 @@ df.show()
 ### Reading Multiple Files
 
 ```python
-# Read all MCAP files in a directory
+# Read all MCAP files in a directory (non-recursive)
 df = spark.read.format("mcap") \
     .option("path", "/path/to/mcap/directory") \
     .option("pathGlobFilter", "*.mcap") \
+    .load()
+
+# Read all MCAP files recursively including subdirectories
+df = spark.read.format("mcap") \
+    .option("path", "/path/to/mcap/directory") \
+    .option("recursiveFileLookup", "true") \
     .load()
 ```
 
